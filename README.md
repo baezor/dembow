@@ -23,8 +23,13 @@ virtualenv venv
 # Activate venv
 source venv/bin/activate
 
-# Install the missing dependencies
-pip install [library]
+# Install python_midi module in normal procedure
+git clone git@github.com:vishnubob/python-midi.git 
+cd python-midi 
+python setup.py install
+
+# Install remaining dependencies with pip.
+pip install [dependencies]
 
 # To train the model and create music
 python fire.py

@@ -1,5 +1,5 @@
 # Dembow
-> The first A.I powered by tensorflow that generates reggeaton. 
+## The first A.I that generates reggaeton hits. 
 
 ![Denbow.jpg](denbow.jpg)
 

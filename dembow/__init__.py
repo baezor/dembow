@@ -1,0 +1,30 @@
+"""Dembow -- a small neural network that generates reggaeton.
+
+The first A.I. that generates reggaeton hits, brought back to life.
+
+The original 2016 project trained a Restricted Boltzmann Machine (RBM) on a
+corpus of reggaeton MIDI files and Gibbs-sampled new patterns out of it. This
+revival keeps that exact idea -- an RBM learning the dembow groove -- but runs
+on a modern stack: Python 3, PyTorch, and ``mido`` instead of TensorFlow 1.x,
+Python 2, and the long-dead ``python-midi`` library.
+"""
+
+from .rbm import RBM
+from .midi_io import (
+    LOWER_BOUND,
+    UPPER_BOUND,
+    SPAN,
+    midi_to_note_state_matrix,
+    note_state_matrix_to_midi,
+)
+
+__version__ = "1.0.0"
+
+__all__ = [
+    "RBM",
+    "LOWER_BOUND",
+    "UPPER_BOUND",
+    "SPAN",
+    "midi_to_note_state_matrix",
+    "note_state_matrix_to_midi",
+]

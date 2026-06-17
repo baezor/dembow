@@ -1,63 +1,95 @@
 # Dembow
-## The first A.I that generates reggaeton hits. 
+## The first A.I. that generates reggaeton hits. 🔥
 
 ![Denbow.jpg](denbow.jpg)
 
-## Machine Learning Techniques
-Using TensorFlow to generate short sequences of music with a [Restricted Boltzmann Machine](http://deeplearning4j.org/restrictedboltzmannmachine.html).
-Do you want to go deep?, see the original technical idea: [How to build an RBM neural network in tensorflow](http://danshiebler.com/2016-08-10-musical-tensorflow-part-one-the-rbm/).
+Dembow learns the *dembow* groove from a corpus of reggaeton MIDI files and
+dreams up new patterns of its own. It is the same scrappy idea it always was —
+a **Restricted Boltzmann Machine** sampling reggaeton out of noise — just
+brought back to life on a modern stack.
 
+## What changed in the revival
 
+The original 2016 project was wonderful and completely unrunnable today. This
+revival keeps its **essence** — the RBM, the piano-roll representation, the
+contrastive-divergence training, the Gibbs sampling — while replacing the dead
+parts underneath:
 
-## Getting Started
+| Then (2016)                       | Now                                  |
+| --------------------------------- | ------------------------------------ |
+| Python 2 (`print "..."`)          | Python 3                             |
+| TensorFlow 1.x graph + `Session`  | PyTorch (CPU/GPU)                    |
+| `python-midi` (unmaintained, Py2) | [`mido`](https://mido.readthedocs.io) |
+| Threw the trained weights away    | Saves & loads checkpoints           |
+| One-shot script                   | A real CLI + installable package     |
+| `glob('*.mid*')` skipped `.MID`   | Case-insensitive corpus loading      |
 
-1. Install [Tensorflow](https://www.tensorflow.org/). If you have trouble running Tensorflow installation it may help:
+The model itself — a Restricted Boltzmann Machine trained with CD-k and sampled
+with a Gibbs chain — is unchanged in spirit. See the original write-ups it was
+based on: Daniel Johnson's
+[biaxial-rnn-music-composition](https://github.com/hexahedria/biaxial-rnn-music-composition)
+and Dan Shiebler's
+[RBM-in-TensorFlow tutorial](http://danshiebler.com/2016-08-10-musical-tensorflow-part-one-the-rbm/).
+
+## Getting started
 
 ```sh
-sudo easy_install pip
-sudo pip install --upgrade virtualenv
- export PIP_REQUIRE_VIRTUALENV=false
-
-```
-
-2. Install [Anaconda and dependencies](https://www.continuum.io/downloads)
-
-3.  Create virtualenv
-```sh
-virtualenv venv
-
-```
-
-4. Activate venv
-```sh
+python -m venv venv
 source venv/bin/activate
+pip install -r requirements.txt      # numpy, mido, torch
+# or install the package + `dembow` command:
+pip install -e .
 ```
 
-5. Install python_midi module in normal procedure
-```sh
-git clone git@github.com:vishnubob/python-midi.git 
-cd python-midi 
-python setup.py install
-```
+## Make magic happen
 
-6. Install remaining dependencies with pip.
-- matplotlib
-- numpy
-- pandas
-- msgpack
-- glob
-- tqdm
+Train the RBM on the included reggaeton corpus, then generate:
 
 ```sh
-pip install [dependencies]
+dembow train                 # -> dembow.pt
+dembow generate              # -> generated/dembow_*.mid
 ```
 
-7. Make magic happen. First train your model with custom parameters and then wait the output. 
+Without installing, the same thing works through the module:
+
+```sh
+python -m dembow.cli train
+python -m dembow.cli generate
+```
+
+Or just light the fire (train + generate in one go, like the original):
+
 ```sh
 python fire.py
 ```
-Depends of the technical capabilities of your computer, it can take from 5 to 10 minutes.
+
+### Useful knobs
+
+```sh
+dembow train --num-epochs 200 --n-hidden 50 --num-timesteps 15 --lr 0.005
+dembow generate --num-samples 10 --tempo-bpm 95 --seed-dir reggaeton_samples
+```
+
+By default generation **seeds each Gibbs chain from a real reggaeton song**, so
+the output stays in the pocket instead of wandering. Pass `--seed-dir none` to
+start from silence like the original did.
+
+## Project layout
+
+```
+dembow/
+  midi_io.py    MIDI <-> piano-roll, via mido (replaces midi_manipulation.py)
+  rbm.py        the Restricted Boltzmann Machine, in PyTorch
+  dataset.py    load the corpus, build training windows
+  train.py      training loop + checkpointing
+  generate.py   sample new patterns and write MIDI
+  cli.py        the `dembow` command
+fire.py         nostalgic one-shot entry point
+reggaeton_samples/   the MIDI corpus
+tests/          a fast end-to-end smoke test
+```
 
 ## Contribute
-We need your help feeding and training our current model. If you have reggeaton samples feel free to contribute. 
 
+We still need your help feeding and training the model. If you have reggaeton
+MIDI, drop it in `reggaeton_samples/` and open a pull request.

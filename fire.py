@@ -17,12 +17,12 @@ Originally based on Daniel Johnson's biaxial-rnn-music-composition and Dan
 Shiebler's RBM-in-TensorFlow tutorial.
 """
 
-from dembow.train import train
+from dembow.train import train_lstm
 from dembow.generate import generate
 
 
 def main():
-    train(data_dir="reggaeton_samples", checkpoint="dembow.pt")
+    train_lstm(data_dir="reggaeton_samples", checkpoint="dembow.pt")
     generate(checkpoint="dembow.pt", output_dir="generated")
 
 

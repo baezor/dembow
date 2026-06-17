@@ -102,6 +102,7 @@ class RBM:
     def save(self, path: str) -> None:
         torch.save(
             {
+                "model_type": "rbm",
                 "config": asdict(self.config),
                 "W": self.W.cpu(),
                 "bv": self.bv.cpu(),

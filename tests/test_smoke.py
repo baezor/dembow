@@ -8,13 +8,27 @@ import tempfile
 
 import numpy as np
 
-from dembow.dataset import build_examples, find_midi_files, load_songs
+from dembow.dataset import (
+    build_examples,
+    build_sequences,
+    find_midi_files,
+    load_feature_songs,
+    load_songs,
+)
+from dembow.lstm import DembowLSTM, LSTMConfig
 from dembow.midi_io import (
     SPAN,
     midi_to_note_state_matrix,
     note_state_matrix_to_midi,
 )
 from dembow.rbm import RBM, RBMConfig
+from dembow.representation import (
+    DRUM_SLICE,
+    N_FEATURES,
+    PLAY_SLICE,
+    features_to_midi,
+    song_to_features,
+)
 
 SAMPLES = os.path.join(os.path.dirname(__file__), "..", "reggaeton_samples")
 
@@ -67,8 +81,53 @@ def test_train_and_generate_tiny():
         assert loaded.W.shape == rbm.W.shape
 
 
+def test_representation_separates_drums():
+    files = find_midi_files(SAMPLES)
+    feats = song_to_features(files[0])
+    assert feats.shape[1] == N_FEATURES
+    # A reggaeton file should have both drum and pitched content.
+    assert feats[:, DRUM_SLICE].sum() > 0
+    assert feats[:, PLAY_SLICE].sum() > 0
+    with tempfile.TemporaryDirectory() as d:
+        out = features_to_midi(feats[:64], os.path.join(d, "feat.mid"))
+        assert os.path.exists(out)
+
+
+def test_lstm_train_and_generate_tiny():
+    songs = load_feature_songs(SAMPLES)
+    seqs = build_sequences(songs, seq_len=16, hop=16)
+    assert seqs.shape[0] > 0 and seqs.shape[2] == N_FEATURES
+
+    import torch
+
+    model = DembowLSTM(LSTMConfig(hidden=32, layers=1))
+    opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+    loss_fn = torch.nn.BCEWithLogitsLoss()
+    data = torch.from_numpy(seqs[:32])
+    for _ in range(5):
+        logits, _ = model(data[:, :-1, :])
+        loss = loss_fn(logits, data[:, 1:, :])
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+
+    out = model.generate(songs[0][:16], num_steps=24, max_pitched=4)
+    assert out.shape == (24, N_FEATURES)
+    # Sparse and binary -- music, not a wall of noise.
+    assert set(np.unique(out)).issubset({0.0, 1.0})
+    assert out[:, PLAY_SLICE].sum(axis=1).max() <= 4
+
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "lstm.pt")
+        model.save(path)
+        loaded = DembowLSTM.load(path)
+        assert loaded.config.hidden == 32
+
+
 if __name__ == "__main__":
     test_finds_uppercase_midi()
     test_midi_roundtrip()
     test_train_and_generate_tiny()
+    test_representation_separates_drums()
+    test_lstm_train_and_generate_tiny()
     print("All smoke tests passed.")

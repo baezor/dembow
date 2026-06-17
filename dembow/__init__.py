@@ -10,6 +10,7 @@ Python 2, and the long-dead ``python-midi`` library.
 """
 
 from .rbm import RBM
+from .lstm import DembowLSTM, LSTMConfig
 from .midi_io import (
     LOWER_BOUND,
     UPPER_BOUND,
@@ -17,14 +18,26 @@ from .midi_io import (
     midi_to_note_state_matrix,
     note_state_matrix_to_midi,
 )
+from .representation import (
+    N_FEATURES,
+    DRUM_CLASSES,
+    song_to_features,
+    features_to_midi,
+)
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "RBM",
+    "DembowLSTM",
+    "LSTMConfig",
     "LOWER_BOUND",
     "UPPER_BOUND",
     "SPAN",
+    "N_FEATURES",
+    "DRUM_CLASSES",
     "midi_to_note_state_matrix",
     "note_state_matrix_to_midi",
+    "song_to_features",
+    "features_to_midi",
 ]

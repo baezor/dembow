@@ -9,6 +9,7 @@ from typing import List
 import numpy as np
 
 from .midi_io import SPAN, midi_to_note_state_matrix
+from .representation import N_FEATURES, song_to_features
 
 
 def find_midi_files(directory: str) -> List[str]:
@@ -53,3 +54,30 @@ def build_examples(songs: List[np.ndarray], num_timesteps: int) -> np.ndarray:
     if not examples:
         return np.zeros((0, num_timesteps * width), dtype=np.float32)
     return np.concatenate(examples, axis=0).astype(np.float32)
+
+
+def load_feature_songs(
+    directory: str, min_steps: int = 32, steps_per_quarter: int = 4, normalize_key: bool = True
+) -> List[np.ndarray]:
+    """Parse songs into the drum+pitched feature representation used by the LSTM."""
+    songs = []
+    for path in find_midi_files(directory):
+        try:
+            song = song_to_features(path, steps_per_quarter=steps_per_quarter, normalize_key=normalize_key)
+        except Exception as exc:
+            print(f"  skipping {os.path.basename(path)}: {type(exc).__name__}: {exc}")
+            continue
+        if song.shape[0] > min_steps:
+            songs.append(song)
+    return songs
+
+
+def build_sequences(songs: List[np.ndarray], seq_len: int, hop: int = 8) -> np.ndarray:
+    """Slice songs into overlapping ``seq_len + 1`` windows for next-step training."""
+    windows = []
+    for song in songs:
+        for start in range(0, song.shape[0] - seq_len - 1, hop):
+            windows.append(song[start : start + seq_len + 1])
+    if not windows:
+        return np.zeros((0, seq_len + 1, N_FEATURES), dtype=np.float32)
+    return np.stack(windows).astype(np.float32)

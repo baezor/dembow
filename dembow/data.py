@@ -17,17 +17,26 @@ def find_midi_files(directory: str) -> List[str]:
     return sorted(f for f in files if f.lower().endswith((".mid", ".midi")))
 
 
-def encode_corpus(directory: str, transpositions: List[int] | None = None) -> List[List[int]]:
-    """Encode every song, optionally augmenting with transposed copies.
+def split_files(paths: List[str], val_frac: float, seed: int = 0) -> tuple[List[str], List[str]]:
+    """Split a file list into (train, val) at the *song* level.
 
-    Pitch augmentation multiplies our tiny ~76-song corpus: each transpose is a
-    musically valid variation, which helps the model generalize instead of just
-    memorizing a handful of files.
+    Splitting by song -- not by window -- matters because pitch augmentation
+    creates transposed copies of each song; a window-level split would leak those
+    copies across the train/val boundary and make the validation loss a lie.
     """
+    rng = np.random.RandomState(seed)
+    order = list(paths)
+    rng.shuffle(order)
+    n_val = int(len(order) * val_frac)
+    return order[n_val:], order[:n_val]
+
+
+def encode_files(paths: List[str], transpositions: List[int] | None = None) -> List[List[int]]:
+    """Encode a specific list of MIDI files (optionally pitch-augmented)."""
     if transpositions is None:
         transpositions = [0]
     songs = []
-    for path in find_midi_files(directory):
+    for path in paths:
         for shift in transpositions:
             try:
                 ids = encode(path, transpose=shift)
@@ -37,6 +46,16 @@ def encode_corpus(directory: str, transpositions: List[int] | None = None) -> Li
             if len(ids) > 8:
                 songs.append(ids)
     return songs
+
+
+def encode_corpus(directory: str, transpositions: List[int] | None = None) -> List[List[int]]:
+    """Encode every song, optionally augmenting with transposed copies.
+
+    Pitch augmentation multiplies our tiny ~76-song corpus: each transpose is a
+    musically valid variation, which helps the model generalize instead of just
+    memorizing a handful of files.
+    """
+    return encode_files(find_midi_files(directory), transpositions)
 
 
 def build_windows(songs: List[List[int]], seq_len: int) -> np.ndarray:

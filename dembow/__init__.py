@@ -13,7 +13,7 @@ recipe used by modern symbolic-music models.
 from .tokenizer import VOCAB, Vocab, encode, decode
 from .model import MusicTransformer, ModelConfig
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 __all__ = [
     "VOCAB",

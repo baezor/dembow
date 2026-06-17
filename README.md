@@ -74,34 +74,62 @@ Or light the fire (train + generate in one go):
 python fire.py
 ```
 
-## Tuning
+## Hardware presets
 
-Training:
+Transformers are slow to train on CPU, so `train` picks a preset automatically
+(small model + early stopping on CPU, a bigger one on GPU). Override it, or any
+individual flag:
 
 ```sh
-dembow train \
-  --num-epochs 120 \       # train longer for tighter structure
-  --d-model 320 --n-layers 6 \   # a bigger model
-  --augment 4              # ±4 semitones of pitch augmentation (0 disables)
+dembow train --preset cpu      # small + fast (auto-selected when no GPU)
+dembow train --preset gpu      # bigger model, more epochs, more augmentation
+dembow train --preset gpu --d-model 320 --n-layers 6   # flags override the preset
 ```
 
-Generation:
+## Training quality: validation + early stopping
+
+Because the corpus is tiny, overfitting is the main risk. Training holds out a
+fraction of **songs** (not windows — so pitch-augmented copies can't leak),
+reports validation loss each epoch, **saves the checkpoint with the best val
+loss**, and stops early when it plateaus:
+
+```sh
+dembow train --val-frac 0.1 --patience 8
+#   epoch   12/40  train 1.49  val 1.71  *best (saved)
+#   ...
+#   Early stopping at epoch 23 (no val improvement for 8 epochs)
+```
+
+## Generation
 
 ```sh
 dembow generate \
   --num-samples 8 \
-  --max-new-tokens 1200 \  # longer songs
-  --temperature 0.9 \      # <1 tighter & more repetitive, >1 wilder
-  --top-p 0.92 \           # nucleus sampling threshold
-  --prime-bars 2 \         # real bars used to kick off each song
-  --seed-dir none          # cold start instead of priming from a real song
+  --max-new-tokens 1200 \     # longer songs
+  --temperature 0.9 \         # <1 tighter & more repetitive, >1 wilder
+  --top-p 0.92 \              # nucleus sampling threshold
+  --repetition-penalty 1.15 \ # discourage degenerate loops (1.0 = off)
+  --no-repeat-ngram 0 \       # hard-ban repeated token n-grams (0 = off)
+  --prime-bars 2 \            # real bars used to kick off each song
+  --seed-dir none             # cold start instead of priming from a real song
 ```
+
+`--repetition-penalty` gently down-weights recently used tokens so the model
+doesn't get stuck looping — while still allowing the musical repetition that
+makes a groove a groove.
+
+## Hear it without training
+
+A few example outputs from a small demo model live in [`examples/`](examples/)
+so you can listen before training your own.
 
 **Honest note on quality.** The corpus is only ~76 short MIDI files, so even a
 Transformer is data-limited — it captures the *feel* (groove, instrumentation,
 key) more than polished, hook-worthy songwriting. The single biggest lever is
-**more clean MIDI** in `reggaeton_samples/`. Pitch augmentation and priming from
-real songs help it stay in the pocket meanwhile.
+**more clean MIDI** in `reggaeton_samples/` (see
+[`reggaeton_samples/SOURCES.md`](reggaeton_samples/SOURCES.md) for where to find
+it). Pitch augmentation and priming from real songs help it stay in the pocket
+meanwhile.
 
 ## Project layout
 
@@ -109,12 +137,13 @@ real songs help it stay in the pocket meanwhile.
 dembow/
   tokenizer.py   MIDI <-> event tokens (the REMI-style music language)
   model.py       the decoder-only Transformer
-  data.py        load the corpus, augment, build training windows
-  train.py       training loop + checkpointing
-  generate.py    sample new songs (temperature / top-p) and write MIDI
-  cli.py         the `dembow` command
+  data.py        corpus loading, pitch augmentation, song-level train/val split
+  train.py       training loop, validation, early stopping, best-checkpoint
+  generate.py    sample new songs (temperature / top-p / repetition control)
+  cli.py         the `dembow` command (with cpu/gpu presets)
 fire.py          one-shot entry point
-reggaeton_samples/   the MIDI corpus
+reggaeton_samples/   the MIDI corpus (+ SOURCES.md: where to find more)
+examples/        a few generated outputs from a small demo model
 tests/           a fast end-to-end smoke test
 ```
 

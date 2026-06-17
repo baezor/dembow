@@ -39,6 +39,8 @@ def generate(
     temperature: float = 1.0,
     top_p: float = 0.92,
     top_k: Optional[int] = None,
+    repetition_penalty: float = 1.15,
+    no_repeat_ngram_size: int = 0,
     prime_bars: int = 2,
     seed_dir: Optional[str] = "reggaeton_samples",
     tempo_bpm: float = 95.0,
@@ -59,7 +61,8 @@ def generate(
         prompt = torch.tensor(prompt_ids, dtype=torch.long)
         ids = model.generate(
             prompt, max_new_tokens=max_new_tokens, temperature=temperature,
-            top_k=top_k, top_p=top_p, eos_id=EOS, device=device,
+            top_k=top_k, top_p=top_p, repetition_penalty=repetition_penalty,
+            no_repeat_ngram_size=no_repeat_ngram_size, eos_id=EOS, device=device,
         )
         midi_file = decode(ids, tempo_bpm=tempo_bpm)
         # A valid song needs at least a couple of note tracks (beyond the meta track).

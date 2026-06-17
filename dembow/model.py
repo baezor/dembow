@@ -16,6 +16,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def _banned_ngram_tokens(ids: list[int], n: int) -> list[int]:
+    """Tokens that would complete a previously seen n-gram given the current tail."""
+    if len(ids) < n:
+        return []
+    prefix = tuple(ids[-(n - 1):]) if n > 1 else ()
+    banned = []
+    for i in range(len(ids) - n + 1):
+        if tuple(ids[i:i + n - 1]) == prefix:
+            banned.append(ids[i + n - 1])
+    return banned
+
+
 @dataclass
 class ModelConfig:
     vocab_size: int
@@ -65,15 +77,35 @@ class MusicTransformer(nn.Module):
         temperature: float = 1.0,
         top_k: int | None = None,
         top_p: float | None = 0.92,
+        repetition_penalty: float = 1.15,
+        recent_window: int = 96,
+        no_repeat_ngram_size: int = 0,
         eos_id: int | None = None,
         device: str | torch.device = "cpu",
     ) -> list[int]:
-        """Autoregressively sample a continuation with temperature + nucleus (top-p)."""
+        """Autoregressively sample a continuation.
+
+        Uses temperature + nucleus (top-p) sampling, plus repetition control to
+        keep the model from collapsing into a degenerate loop -- a real risk when
+        a Transformer is trained on so little data. ``repetition_penalty`` gently
+        down-weights tokens seen in the last ``recent_window`` steps (musical
+        repetition is still allowed); ``no_repeat_ngram_size`` hard-bans exact
+        n-gram repeats when > 0.
+        """
         self.eval()
         ids = prompt.to(device).tolist()
         for _ in range(max_new_tokens):
             context = torch.tensor(ids[-self.config.max_len:], device=device).unsqueeze(0)
-            logits = self.forward(context)[0, -1] / max(temperature, 1e-6)
+            logits = self.forward(context)[0, -1]
+
+            if repetition_penalty and repetition_penalty != 1.0:
+                for t in set(ids[-recent_window:]):
+                    logits[t] = logits[t] / repetition_penalty if logits[t] > 0 else logits[t] * repetition_penalty
+            if no_repeat_ngram_size > 0:
+                for t in _banned_ngram_tokens(ids, no_repeat_ngram_size):
+                    logits[t] = -float("inf")
+
+            logits = logits / max(temperature, 1e-6)
 
             if top_k is not None:
                 kth = torch.topk(logits, top_k).values[-1]

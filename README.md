@@ -3,48 +3,46 @@
 
 ![Denbow.jpg](denbow.jpg)
 
-Dembow learns the *dembow* groove from a corpus of reggaeton MIDI files and
-dreams up new patterns of its own. It started life in 2016 as a Restricted
-Boltzmann Machine; it has since grown a sequence model that actually understands
-the beat — but it kept its soul.
+Dembow learns from a corpus of reggaeton MIDI and writes new tracks of its own.
+It began life in 2016 as a Restricted Boltzmann Machine over a binary piano roll;
+it is now a **decoder-only Transformer over an event-based music language** — the
+same recipe behind modern symbolic-music models.
 
-## Two engines, same soul
+## How it works
 
-| Engine | What it is | Use it for |
-| --- | --- | --- |
-| **LSTM** (default) | A recurrent net that reads the song one 16th-note at a time and predicts what comes next. It learns *sequence* — the dembow kick/snare, where the bass lands, how a phrase moves. | Output that actually grooves. |
-| **RBM** (classic) | The original 2016 model: a Restricted Boltzmann Machine sampling a static "bag of notes" with contrastive divergence + Gibbs sampling. | Nostalgia, and seeing where it all started. |
+Dembow treats music the way a language model treats text. Every song is
+tokenized into a stream of musical **events** (REMI-style):
 
-### Why the early version sounded like noise
+```
+BOS  BAR  POS_0  INST_drums DRUM_kick  DUR_1 VEL_5
+              POS_0  INST_bass  PITCH_36   DUR_4 VEL_6
+              POS_4  INST_drums DRUM_snare DUR_1 VEL_5  ...
+     BAR  ...  EOS
+```
 
-The original threw every one of a song's ~6–7 tracks into a single piano roll,
-which blended the **dembow drums** (channel 9 — almost half of all the notes in
-the corpus, and the signature of the genre) in with bass and melody, scrambling
-the groove. It also modelled a window of time as an unordered set, so it had no
-way to learn "boom — boom-chick," and it sampled every pitch independently, so
-each output was a wall of 300+ simultaneous notes.
+Each note carries its **instrument group** (drums / bass / mid / high), **pitch**,
+**duration**, and **velocity** — so the model can write expressive,
+multi-instrument arrangements, not a flat on/off grid. A small Transformer then
+learns to predict the next event from everything before it, using masked
+self-attention to capture phrasing, repetition, and the way the drums and bass
+lock into the dembow groove.
 
-The revival fixes the **representation** for both engines:
+Generation is autoregressive with **temperature + nucleus (top-p) sampling**, the
+standard modern decoding strategy.
 
-- **Drums are separated** from pitched content and bucketed into musical classes
-  (kick, snare, clap, hats, …), so the model can learn the beat as a beat.
-- **Songs are transposed to a common key**, so it learns relative harmony
-  instead of smearing every key together.
-- **Output is kept sparse** — a handful of notes per step — so it's music.
-
-## What changed in the revival
+## What changed from the original
 
 | Then (2016) | Now |
 | --- | --- |
-| Python 2 (`print "..."`) | Python 3 |
-| TensorFlow 1.x graph + `Session` | **PyTorch** (CPU/GPU) |
-| `python-midi` (unmaintained, Py2) | [`mido`](https://mido.readthedocs.io) |
-| All tracks flattened into one roll | **Drums separated**, key-normalized |
-| RBM only (no sense of time) | **LSTM** sequence model (+ RBM classic) |
-| 300+ notes of noise per window | Sparse, groove-aware output |
-| Threw the trained weights away | Saves & loads checkpoints |
-| One-shot script | A real CLI + installable package |
-| `glob('*.mid*')` skipped `.MID` | Case-insensitive corpus loading |
+| Python 2, TensorFlow 1.x | Python 3, **PyTorch** |
+| Restricted Boltzmann Machine | **Decoder-only Transformer** |
+| Binary piano roll (on/off only) | **Event tokens**: pitch + duration + velocity |
+| All tracks flattened into one roll | **Multi-instrument** (drums / bass / mid / high) |
+| No sense of time | **Self-attention** over the whole sequence |
+| Trained on ~76 raw files | **Pitch-augmented** corpus (×7) for generalization |
+| `python-midi` (Py2, dead) | [`mido`](https://mido.readthedocs.io) |
+| Threw the weights away | Saves & loads checkpoints |
+| One-shot script | A real CLI + installable package + CI |
 
 ## Getting started
 
@@ -58,103 +56,70 @@ pip install -e .
 
 ## Make magic happen
 
-Train the default LSTM on the included reggaeton corpus, then generate:
-
 ```sh
-dembow train                 # -> dembow.pt   (LSTM, ~1 min on CPU)
+dembow train                 # -> dembow.pt
 dembow generate              # -> generated/dembow_*.mid
 ```
 
-Want the original model? Just ask for it:
-
-```sh
-dembow train --model rbm
-dembow generate              # generation auto-detects the model in the checkpoint
-```
-
-Without installing, the same things work through the module:
+Without installing:
 
 ```sh
 python -m dembow.cli train
 python -m dembow.cli generate
 ```
 
-Or just light the fire (train + generate in one go):
+Or light the fire (train + generate in one go):
 
 ```sh
 python fire.py
 ```
 
-## The dembow groove backbone
+## Tuning
 
-The signature of reggaeton is its drum pattern, so by default Dembow **locks the
-drums to the canonical dembow groove** and lets the LSTM improvise bass and
-melody on top. The groove isn't guessed — it's **derived from the corpus**, by
-averaging drum onsets across every bar of every song. What emerges is the
-textbook dembow:
-
-```
-kick        X...X...X...X...   downbeats
-snare       ...X..X....X..X.   the iconic "boom-ch-boom-chick" (steps 3, 6, 11, 14)
-closed_hat  X..XX.X.X..XX.X.   steady eighths
-```
-
-Locking it in means every track grooves the same way a reggaeton track does —
-no more takes that drop the snare or drift off the beat. Control it with
-`--groove`:
+Training:
 
 ```sh
-dembow generate --groove auto     # derive the groove from the corpus (default)
-dembow generate --groove dembow   # the canonical pattern, hardcoded
-dembow generate --groove none     # let the model play its own drums (looser)
+dembow train \
+  --num-epochs 120 \       # train longer for tighter structure
+  --d-model 320 --n-layers 6 \   # a bigger model
+  --augment 4              # ±4 semitones of pitch augmentation (0 disables)
 ```
 
-## Making it sound more like reggaeton
-
-Generation **primes each track with the opening bars of a real reggaeton song**,
-so the melody starts in the pocket, then improvises over the dembow backbone. A
-few knobs to push it further:
+Generation:
 
 ```sh
-# train longer / bigger for a tighter groove
-dembow train --num-epochs 150 --hidden 384 --seq-len 96
-
-# generation controls
 dembow generate \
   --num-samples 8 \
-  --num-steps 128 \        # length after the priming bars
-  --max-pitched 4 \        # fewer simultaneous notes = cleaner melody
-  --temperature 0.8 \      # <1 = tighter & more repetitive, >1 = wilder
-  --tempo-bpm 95           # reggaeton pocket
+  --max-new-tokens 1200 \  # longer songs
+  --temperature 0.9 \      # <1 tighter & more repetitive, >1 wilder
+  --top-p 0.92 \           # nucleus sampling threshold
+  --prime-bars 2 \         # real bars used to kick off each song
+  --seed-dir none          # cold start instead of priming from a real song
 ```
 
-**Honest note on quality.** The corpus is only ~76 short MIDI files, so the
-model is data-limited — it captures the *feel* (the beat, the density, the key)
-more than polished, hook-worthy songwriting. The single biggest lever now is
-**more clean MIDI** in `reggaeton_samples/` (and longer training). Separating
-the bass onto its own track, and adding song structure (intro / drop), are the
-natural next steps.
+**Honest note on quality.** The corpus is only ~76 short MIDI files, so even a
+Transformer is data-limited — it captures the *feel* (groove, instrumentation,
+key) more than polished, hook-worthy songwriting. The single biggest lever is
+**more clean MIDI** in `reggaeton_samples/`. Pitch augmentation and priming from
+real songs help it stay in the pocket meanwhile.
 
 ## Project layout
 
 ```
 dembow/
-  representation.py  drum+pitched, key-normalized features (the genre-aware input)
-  groove.py          the canonical dembow drum backbone (derived from the corpus)
-  lstm.py            the sequence model (default engine)
-  rbm.py             the Restricted Boltzmann Machine (classic engine)
-  midi_io.py         basic MIDI <-> piano roll, via mido
-  dataset.py         load the corpus, build training windows/sequences
-  train.py           training loops + checkpointing
-  generate.py        sample new patterns and write MIDI
-  cli.py             the `dembow` command
-fire.py              nostalgic one-shot entry point
+  tokenizer.py   MIDI <-> event tokens (the REMI-style music language)
+  model.py       the decoder-only Transformer
+  data.py        load the corpus, augment, build training windows
+  train.py       training loop + checkpointing
+  generate.py    sample new songs (temperature / top-p) and write MIDI
+  cli.py         the `dembow` command
+fire.py          one-shot entry point
 reggaeton_samples/   the MIDI corpus
-tests/               a fast end-to-end smoke test
+tests/           a fast end-to-end smoke test
 ```
 
 ## Contribute
 
-We still need your help feeding and training the model. If you have reggaeton
-MIDI, drop it in `reggaeton_samples/` and open a pull request — more data is the
-single best way to make Dembow sound like a hit.
+We still need your help feeding the model. If you have reggaeton MIDI, drop it in
+`reggaeton_samples/` and open a pull request — more data is the single best way
+to make Dembow sound like a hit.

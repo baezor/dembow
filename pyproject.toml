@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dembow"
-version = "1.0.0"
-description = "The first A.I. that generates reggaeton hits -- a Restricted Boltzmann Machine for dembow."
+version = "2.0.0"
+description = "The first A.I. that generates reggaeton hits -- a Transformer for dembow."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }

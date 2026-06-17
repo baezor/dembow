@@ -1,47 +1,25 @@
-"""Dembow -- a small neural network that generates reggaeton.
+"""Dembow -- a Transformer that generates reggaeton.
 
-The first A.I. that generates reggaeton hits, brought back to life.
+The first A.I. that generates reggaeton hits, rebuilt around a modern,
+event-based music language model.
 
-The original 2016 project trained a Restricted Boltzmann Machine (RBM) on a
-corpus of reggaeton MIDI files and Gibbs-sampled new patterns out of it. This
-revival keeps that exact idea -- an RBM learning the dembow groove -- but runs
-on a modern stack: Python 3, PyTorch, and ``mido`` instead of TensorFlow 1.x,
-Python 2, and the long-dead ``python-midi`` library.
+The 2016 original trained a Restricted Boltzmann Machine on a binary piano roll.
+This version replaces that entirely: songs are tokenized into a REMI-style stream
+of musical events (bar, position, instrument, pitch, duration, velocity) and a
+decoder-only Transformer learns to generate them one token at a time -- the same
+recipe used by modern symbolic-music models.
 """
 
-from .rbm import RBM
-from .lstm import DembowLSTM, LSTMConfig
-from .midi_io import (
-    LOWER_BOUND,
-    UPPER_BOUND,
-    SPAN,
-    midi_to_note_state_matrix,
-    note_state_matrix_to_midi,
-)
-from .representation import (
-    N_FEATURES,
-    DRUM_CLASSES,
-    song_to_features,
-    features_to_midi,
-)
-from .groove import canonical_groove, fallback_groove, groove_track
+from .tokenizer import VOCAB, Vocab, encode, decode
+from .model import MusicTransformer, ModelConfig
 
-__version__ = "1.2.0"
+__version__ = "2.0.0"
 
 __all__ = [
-    "RBM",
-    "DembowLSTM",
-    "LSTMConfig",
-    "LOWER_BOUND",
-    "UPPER_BOUND",
-    "SPAN",
-    "N_FEATURES",
-    "DRUM_CLASSES",
-    "midi_to_note_state_matrix",
-    "note_state_matrix_to_midi",
-    "song_to_features",
-    "features_to_midi",
-    "canonical_groove",
-    "fallback_groove",
-    "groove_track",
+    "VOCAB",
+    "Vocab",
+    "encode",
+    "decode",
+    "MusicTransformer",
+    "ModelConfig",
 ]

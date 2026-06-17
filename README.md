@@ -85,11 +85,35 @@ Or just light the fire (train + generate in one go):
 python fire.py
 ```
 
+## The dembow groove backbone
+
+The signature of reggaeton is its drum pattern, so by default Dembow **locks the
+drums to the canonical dembow groove** and lets the LSTM improvise bass and
+melody on top. The groove isn't guessed — it's **derived from the corpus**, by
+averaging drum onsets across every bar of every song. What emerges is the
+textbook dembow:
+
+```
+kick        X...X...X...X...   downbeats
+snare       ...X..X....X..X.   the iconic "boom-ch-boom-chick" (steps 3, 6, 11, 14)
+closed_hat  X..XX.X.X..XX.X.   steady eighths
+```
+
+Locking it in means every track grooves the same way a reggaeton track does —
+no more takes that drop the snare or drift off the beat. Control it with
+`--groove`:
+
+```sh
+dembow generate --groove auto     # derive the groove from the corpus (default)
+dembow generate --groove dembow   # the canonical pattern, hardcoded
+dembow generate --groove none     # let the model play its own drums (looser)
+```
+
 ## Making it sound more like reggaeton
 
 Generation **primes each track with the opening bars of a real reggaeton song**,
-so it starts in the pocket — including the dembow drums — then improvises from
-there. A few knobs to push it further:
+so the melody starts in the pocket, then improvises over the dembow backbone. A
+few knobs to push it further:
 
 ```sh
 # train longer / bigger for a tighter groove
@@ -106,17 +130,17 @@ dembow generate \
 
 **Honest note on quality.** The corpus is only ~76 short MIDI files, so the
 model is data-limited — it captures the *feel* (the beat, the density, the key)
-more than polished, hook-worthy songwriting. The two biggest levers are **more
-clean MIDI** in `reggaeton_samples/` and longer training. If you want the
-dembow beat to be rock-solid every time, the natural next step is a
-*groove-template* mode that locks in the canonical dembow drum pattern and lets
-the model improvise bass and melody over it.
+more than polished, hook-worthy songwriting. The single biggest lever now is
+**more clean MIDI** in `reggaeton_samples/` (and longer training). Separating
+the bass onto its own track, and adding song structure (intro / drop), are the
+natural next steps.
 
 ## Project layout
 
 ```
 dembow/
   representation.py  drum+pitched, key-normalized features (the genre-aware input)
+  groove.py          the canonical dembow drum backbone (derived from the corpus)
   lstm.py            the sequence model (default engine)
   rbm.py             the Restricted Boltzmann Machine (classic engine)
   midi_io.py         basic MIDI <-> piano roll, via mido

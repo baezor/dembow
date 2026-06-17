@@ -59,6 +59,7 @@ class DembowLSTM(nn.Module):
         drum_threshold: float = 0.4,
         pitch_threshold: float = 0.5,
         temperature: float = 1.0,
+        drum_track: np.ndarray | None = None,
         device: str | torch.device = "cpu",
     ) -> np.ndarray:
         """Autoregressively roll out ``num_steps`` from a priming sequence.
@@ -66,6 +67,10 @@ class DembowLSTM(nn.Module):
         ``prime`` is a ``[P, N_FEATURES]`` seed (e.g. the opening of a real song).
         Pitched output is kept sparse -- at most ``max_pitched`` notes per step,
         chosen by probability -- so the result is music, not a wall of noise.
+
+        If ``drum_track`` (``[num_steps, N_DRUMS]``) is given, the drums are
+        locked to it -- the canonical dembow groove -- and the model only
+        improvises bass and melody on top, conditioned on that steady beat.
         """
         self.eval()
         device = torch.device(device)
@@ -82,8 +87,11 @@ class DembowLSTM(nn.Module):
             probs = torch.sigmoid(logits.squeeze(0).squeeze(0) / temperature).cpu().numpy()
 
             step = np.zeros(N_FEATURES, dtype=np.float32)
-            # Drums: independent threshold per class.
-            step[DRUM_SLICE] = (probs[DRUM_SLICE] > drum_threshold).astype(np.float32)
+            # Drums: locked to the supplied groove, or sampled by threshold.
+            if drum_track is not None:
+                step[DRUM_SLICE] = drum_track[len(generated) % len(drum_track)]
+            else:
+                step[DRUM_SLICE] = (probs[DRUM_SLICE] > drum_threshold).astype(np.float32)
 
             # Pitched: keep only the few most likely notes above threshold.
             play_probs = probs[PLAY_SLICE].copy()

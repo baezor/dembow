@@ -24,8 +24,9 @@ from .representation import (
     song_to_features,
     features_to_midi,
 )
+from .groove import canonical_groove, fallback_groove, groove_track
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 __all__ = [
     "RBM",
@@ -40,4 +41,7 @@ __all__ = [
     "note_state_matrix_to_midi",
     "song_to_features",
     "features_to_midi",
+    "canonical_groove",
+    "fallback_groove",
+    "groove_track",
 ]

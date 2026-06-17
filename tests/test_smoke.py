@@ -124,10 +124,44 @@ def test_lstm_train_and_generate_tiny():
         assert loaded.config.hidden == 32
 
 
+def test_groove_backbone():
+    from dembow.groove import canonical_groove, fallback_groove, tile_groove
+    from dembow.representation import N_DRUMS
+
+    songs = load_feature_songs(SAMPLES)
+    pattern = canonical_groove(songs)
+    assert pattern.shape == (16, N_DRUMS)
+    # The corpus groove must include the signature: kick on beat 1, a snare.
+    assert pattern[0, 0] == 1.0          # kick on the downbeat
+    assert pattern[:, 1].sum() > 0       # snare present
+
+    fb = fallback_groove()
+    assert fb[3, 1] == 1.0 and fb[6, 1] == 1.0  # the iconic dembow snare hits
+
+    track = tile_groove(pattern, 40)
+    assert track.shape == (40, N_DRUMS)
+
+
+def test_lstm_generate_with_groove_locks_drums():
+    import torch
+
+    from dembow.groove import tile_groove, fallback_groove
+    from dembow.representation import DRUM_SLICE
+
+    songs = load_feature_songs(SAMPLES)
+    model = DembowLSTM(LSTMConfig(hidden=32, layers=1))
+    drum_track = tile_groove(fallback_groove(), 32)
+    out = model.generate(songs[0][:16], num_steps=32, drum_track=drum_track)
+    # Drums in the output must match the locked groove exactly.
+    assert np.array_equal(out[:, DRUM_SLICE], drum_track)
+
+
 if __name__ == "__main__":
     test_finds_uppercase_midi()
     test_midi_roundtrip()
     test_train_and_generate_tiny()
     test_representation_separates_drums()
     test_lstm_train_and_generate_tiny()
+    test_groove_backbone()
+    test_lstm_generate_with_groove_locks_drums()
     print("All smoke tests passed.")

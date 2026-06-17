@@ -46,6 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--prime-steps", type=int, default=16, help="seed steps taken from a real song (lstm)")
     g.add_argument("--max-pitched", type=int, default=5, help="max simultaneous pitched notes (lstm)")
     g.add_argument("--temperature", type=float, default=1.0, help="<1 tighter, >1 wilder (lstm)")
+    g.add_argument("--groove", choices=["auto", "dembow", "none"], default="auto",
+                   help="lock drums to a dembow backbone: auto (from corpus), dembow (canonical), or none (let the model drum)")
     g.add_argument("--k", type=int, default=1, help="Gibbs steps (rbm)")
     g.add_argument("--seed-dir", default="reggaeton_samples", help="seed from real songs ('none' to start silent)")
     g.add_argument("--tempo-bpm", type=float, default=95.0)
@@ -102,6 +104,7 @@ def main(argv=None) -> None:
             prime_steps=args.prime_steps,
             max_pitched=args.max_pitched,
             temperature=args.temperature,
+            groove=args.groove,
             k=args.k,
             seed_dir=seed_dir,
             tempo_bpm=args.tempo_bpm,

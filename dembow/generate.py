@@ -28,6 +28,7 @@ def generate(
     prime_steps: int = 16,
     max_pitched: int = 5,
     temperature: float = 1.0,
+    groove: str = "auto",
     seed_dir: Optional[str] = "reggaeton_samples",
     tempo_bpm: float = 95.0,
     random_seed: int = 0,
@@ -44,7 +45,7 @@ def generate(
     if _checkpoint_type(checkpoint) == "lstm":
         return _generate_lstm(
             checkpoint, output_dir, num_samples, num_steps, prime_steps,
-            max_pitched, temperature, seed_dir, tempo_bpm, device,
+            max_pitched, temperature, groove, seed_dir, tempo_bpm, device,
         )
     return _generate_rbm(
         checkpoint, output_dir, num_samples, k, seed_dir, tempo_bpm, device,
@@ -52,38 +53,38 @@ def generate(
 
 
 def _generate_lstm(checkpoint, output_dir, num_samples, num_steps, prime_steps,
-                   max_pitched, temperature, seed_dir, tempo_bpm, device) -> List[str]:
+                   max_pitched, temperature, groove, seed_dir, tempo_bpm, device) -> List[str]:
+    from .groove import canonical_groove, fallback_groove, tile_groove
+    from .representation import DRUM_SLICE
+
     model = DembowLSTM.load(checkpoint, device=device)
 
-    # Prime each generation with the opening bars of a real reggaeton song so the
-    # model starts in the pocket -- including the dembow drum groove.
-    primes = []
+    # Load the corpus once: used both to prime generation and to derive the groove.
+    corpus = []
     if seed_dir and os.path.isdir(seed_dir):
         for path in find_midi_files(seed_dir):
-            song = song_to_features(path)
-            if song.shape[0] > prime_steps:
-                primes.append(song[:prime_steps])
-            if len(primes) >= num_samples:
-                break
+            corpus.append(song_to_features(path))
+
+    # Prime each generation with the opening bars of a real reggaeton song so the
+    # model starts in the pocket.
+    primes = [s[:prime_steps] for s in corpus if s.shape[0] > prime_steps]
     if not primes:
         primes = [np.zeros((prime_steps, N_FEATURES), dtype=np.float32)]
 
-    from .representation import DRUM_SLICE
+    # Build the dembow drum backbone the model will groove over.
+    drum_track = None
+    if groove == "auto":
+        pattern = canonical_groove(corpus) if corpus else fallback_groove()
+        drum_track = tile_groove(pattern, num_steps)
+    elif groove == "dembow":
+        drum_track = tile_groove(fallback_groove(), num_steps)
 
     written = []
     for i in range(num_samples):
         prime = primes[i % len(primes)]
-        # An LSTM can drift into silence (an empty step begets empty steps). If
-        # the beat dies, re-roll with a more permissive drum threshold so every
-        # track the user gets actually grooves.
-        body = None
-        for drum_threshold in (0.4, 0.3, 0.22):
-            body = model.generate(
-                prime, num_steps=num_steps, max_pitched=max_pitched,
-                drum_threshold=drum_threshold, temperature=temperature, device=device,
-            )
-            if body[:, DRUM_SLICE].sum() >= num_steps * 0.3:
-                break
+        body = _roll_out(
+            model, prime, num_steps, max_pitched, temperature, drum_track, device,
+        )
         full = np.concatenate([prime, body], axis=0)
         out_path = os.path.join(output_dir, f"dembow_{i}.mid")
         features_to_midi(full, out_path, tempo_bpm=tempo_bpm)
@@ -91,6 +92,33 @@ def _generate_lstm(checkpoint, output_dir, num_samples, num_steps, prime_steps,
 
     print(f"Wrote {len(written)} MIDI file(s) to '{output_dir}/' (LSTM)")
     return written
+
+
+def _roll_out(model, prime, num_steps, max_pitched, temperature, drum_track, device):
+    """Generate one body, re-rolling if drums or melody drift into silence.
+
+    An LSTM can collapse into emptiness (an empty step begets empty steps). We
+    try progressively more permissive settings until both the beat (when not
+    locked to a groove) and the melody clear a minimum density.
+    """
+    from .representation import PLAY_SLICE
+
+    attempts = [
+        dict(drum_threshold=0.40, pitch_threshold=0.50, temperature=temperature),
+        dict(drum_threshold=0.30, pitch_threshold=0.40, temperature=max(temperature, 1.1)),
+        dict(drum_threshold=0.22, pitch_threshold=0.32, temperature=max(temperature, 1.25)),
+    ]
+    body = None
+    for params in attempts:
+        body = model.generate(
+            prime, num_steps=num_steps, max_pitched=max_pitched,
+            drum_track=drum_track, device=device, **params,
+        )
+        drums_ok = drum_track is not None or body[:, DRUM_SLICE].sum() >= num_steps * 0.3
+        melody_ok = body[:, PLAY_SLICE].sum() >= num_steps * 0.5
+        if drums_ok and melody_ok:
+            break
+    return body
 
 
 def _seed_from_song(path: str, num_timesteps: int) -> Optional[torch.Tensor]:

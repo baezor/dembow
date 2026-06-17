@@ -106,3 +106,5 @@ ENV/
 # Dembow artifacts
 *.pt
 generated/
+# ...but the bundled pretrained model ships with the package
+!dembow/assets/*.pt

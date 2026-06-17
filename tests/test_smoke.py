@@ -119,6 +119,28 @@ def test_generate_repetition_controls():
     decode(ids)  # must still decode
 
 
+def test_bundled_pretrained_model_loads():
+    from dembow.generate import BUNDLED_CHECKPOINT
+    from dembow.model import MusicTransformer
+
+    assert os.path.exists(BUNDLED_CHECKPOINT), "a pretrained model should ship with the package"
+    model = MusicTransformer.load(BUNDLED_CHECKPOINT)
+    assert model.config.vocab_size == len(VOCAB)
+
+
+def test_render_to_wav_builtin():
+    import wave
+
+    from dembow.render import render_to_wav
+
+    files = find_midi_files(SAMPLES)
+    with tempfile.TemporaryDirectory() as d:
+        wav = render_to_wav(files[0], os.path.join(d, "out.wav"))
+        assert os.path.exists(wav)
+        with wave.open(wav) as w:
+            assert w.getnframes() > 0  # produced audible audio
+
+
 if __name__ == "__main__":
     test_finds_uppercase_midi()
     test_tokenizer_roundtrip()
@@ -127,4 +149,6 @@ if __name__ == "__main__":
     test_train_and_generate_tiny()
     test_split_files_is_disjoint()
     test_generate_repetition_controls()
+    test_bundled_pretrained_model_loads()
+    test_render_to_wav_builtin()
     print("All smoke tests passed.")

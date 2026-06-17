@@ -13,6 +13,19 @@ from .model import MusicTransformer
 from .tokenizer import BAR, BOS, EOS, decode, encode
 
 
+BUNDLED_CHECKPOINT = os.path.join(os.path.dirname(__file__), "assets", "dembow-pretrained.pt")
+
+
+def _resolve_checkpoint(checkpoint: str) -> str:
+    """Use the given checkpoint, or fall back to the bundled pretrained model."""
+    if os.path.exists(checkpoint):
+        return checkpoint
+    if os.path.exists(BUNDLED_CHECKPOINT):
+        print(f"'{checkpoint}' not found -- using the bundled pretrained model.")
+        return BUNDLED_CHECKPOINT
+    raise SystemExit(f"No checkpoint at '{checkpoint}' and no bundled model. Train one with `dembow train`.")
+
+
 def _prime_tokens(seed_dir: Optional[str], prime_bars: int) -> List[int]:
     """Build a priming prompt from the opening bars of a real reggaeton song."""
     if not seed_dir or not os.path.isdir(seed_dir):
@@ -44,6 +57,8 @@ def generate(
     prime_bars: int = 2,
     seed_dir: Optional[str] = "reggaeton_samples",
     tempo_bpm: float = 95.0,
+    render: bool = False,
+    soundfont: Optional[str] = None,
     random_seed: int = 0,
     device: str | None = None,
 ) -> List[str]:
@@ -53,7 +68,7 @@ def generate(
     np.random.seed(random_seed)
     os.makedirs(output_dir, exist_ok=True)
 
-    model = MusicTransformer.load(checkpoint, device=device)
+    model = MusicTransformer.load(_resolve_checkpoint(checkpoint), device=device)
     prompt_ids = _prime_tokens(seed_dir, prime_bars)
 
     written = []
@@ -71,6 +86,10 @@ def generate(
         out_path = os.path.join(output_dir, f"dembow_{i}.mid")
         midi_file.save(out_path)
         written.append(out_path)
+        if render:
+            from .render import render_to_wav
 
-    print(f"Wrote {len(written)} MIDI file(s) to '{output_dir}/'")
+            render_to_wav(out_path, out_path[:-4] + ".wav", soundfont=soundfont)
+
+    print(f"Wrote {len(written)} MIDI file(s) to '{output_dir}/'" + ("  (+ .wav audio)" if render else ""))
     return written

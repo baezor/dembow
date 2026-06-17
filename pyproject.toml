@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dembow"
-version = "2.1.0"
+version = "2.2.0"
 description = "The first A.I. that generates reggaeton hits -- a Transformer for dembow."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -20,6 +20,9 @@ dembow = "dembow.cli:main"
 
 [tool.setuptools]
 packages = ["dembow"]
+
+[tool.setuptools.package-data]
+dembow = ["assets/*.pt"]
 
 [tool.pytest.ini_options]
 # Put the repo root on sys.path so `pytest tests/` finds the package without an

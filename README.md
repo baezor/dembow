@@ -56,9 +56,19 @@ pip install -e .
 
 ## Make magic happen
 
+A **pretrained model ships with the package**, so you can generate immediately —
+no training required:
+
+```sh
+dembow generate              # uses the bundled model -> generated/dembow_*.mid
+dembow generate --render     # also write .wav so you can actually hear it
+```
+
+Train your own (better, especially with more data):
+
 ```sh
 dembow train                 # -> dembow.pt
-dembow generate              # -> generated/dembow_*.mid
+dembow generate              # picks up your dembow.pt automatically
 ```
 
 Without installing:
@@ -118,6 +128,17 @@ dembow generate \
 doesn't get stuck looping — while still allowing the musical repetition that
 makes a groove a groove.
 
+### Hearing it (audio)
+
+```sh
+dembow generate --render                       # writes .wav next to each .mid
+dembow generate --render --soundfont my.sf2    # better quality via FluidSynth
+```
+
+`--render` turns each generated song into audio. If [FluidSynth](https://www.fluidsynth.org/)
+and a SoundFont are installed it uses them for realistic instruments; otherwise
+it falls back to a small built-in synth so rendering works with no extra setup.
+
 ## Hear it without training
 
 A few example outputs from a small demo model live in [`examples/`](examples/)
@@ -140,7 +161,9 @@ dembow/
   data.py        corpus loading, pitch augmentation, song-level train/val split
   train.py       training loop, validation, early stopping, best-checkpoint
   generate.py    sample new songs (temperature / top-p / repetition control)
+  render.py      MIDI -> audio (FluidSynth, or a builtin dependency-free synth)
   cli.py         the `dembow` command (with cpu/gpu presets)
+  assets/        a bundled pretrained model so generation works out of the box
 fire.py          one-shot entry point
 reggaeton_samples/   the MIDI corpus (+ SOURCES.md: where to find more)
 examples/        a few generated outputs from a small demo model

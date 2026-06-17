@@ -70,6 +70,8 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--prime-bars", type=int, default=2, help="real bars used to prime each song ('--seed-dir none' for cold start)")
     g.add_argument("--seed-dir", default="reggaeton_samples")
     g.add_argument("--tempo-bpm", type=float, default=95.0)
+    g.add_argument("--render", action="store_true", help="also render each song to .wav audio")
+    g.add_argument("--soundfont", default=None, help="SoundFont (.sf2) for FluidSynth rendering; omit to use the builtin synth")
     g.add_argument("--random-seed", type=int, default=0)
     g.add_argument("--device", default=None)
 
@@ -117,6 +119,8 @@ def main(argv=None) -> None:
             prime_bars=args.prime_bars,
             seed_dir=seed_dir,
             tempo_bpm=args.tempo_bpm,
+            render=args.render,
+            soundfont=args.soundfont,
             random_seed=args.random_seed,
             device=args.device,
         )

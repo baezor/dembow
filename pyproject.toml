@@ -20,3 +20,9 @@ dembow = "dembow.cli:main"
 
 [tool.setuptools]
 packages = ["dembow"]
+
+[tool.pytest.ini_options]
+# Put the repo root on sys.path so `pytest tests/` finds the package without an
+# install step (used both locally and in CI).
+pythonpath = ["."]
+testpaths = ["tests"]
